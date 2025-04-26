@@ -14,7 +14,14 @@ app.use(cors());
 app.use(express.json());
 
 // Set up multer for audio file uploads
-const upload = multer({ dest: "uploads/" });
+const storage = multer.diskStorage({
+  destination: "uploads/",
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);  // Save as recording.webm instead of random name
+  },
+});
+
+const upload = multer({ storage });
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -25,12 +32,11 @@ app.post("/whisper", upload.single("file"), async (req, res) => {
   try {
     console.log("📄 File received by backend:", req.file);
 
-const transcript = await openai.audio.transcriptions.create({
-  file: fs.createReadStream(req.file.path),
-  model: "whisper-1",
-  fileName: "recording.webm"   // 👈 ADD THIS
-});
-
+    const transcript = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(req.file.path),
+      model: "whisper-1",
+      fileName: req.file.originalname  // ← dynamic and safe
+    });
 
     fs.unlinkSync(req.file.path); // cleanup
     res.json({ transcript: transcript.text });
@@ -40,6 +46,7 @@ const transcript = await openai.audio.transcriptions.create({
     res.status(500).json({ error: "Transcription failed" });
   }
 });
+
 
 // Health check (for Render etc.)
 app.get("/", (req, res) => {
