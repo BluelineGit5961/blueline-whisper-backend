@@ -22,36 +22,36 @@ const openai = new OpenAI({
 // Whisper endpoint
 app.post("/whisper", upload.single("audio"), async (req, res) => {
   try {
-    console.log("🎤 Received audio file:", req.file);
+    console.log("🛜 Received audio upload:", req.file);
 
-    if (!req.file) {
-      console.error("❌ No file uploaded!");
-      return res.status(400).json({ error: "No file uploaded." });
-    }
-
-    const audioPath = req.file.path;
-    console.log("📂 Audio path:", audioPath);
-
-    const transcript = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(audioPath),
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(req.file.path),
+      filename: req.file.originalname,   // important
       model: "whisper-1",
-      response_format: "json"
+      response_format: "json",
+      language: "en",
     });
 
-    console.log("✅ Transcript result:", transcript);
+    console.log("✅ Transcription successful:", transcription.text);
 
     // Cleanup
-    fs.unlinkSync(audioPath);
+    fs.unlinkSync(req.file.path);
 
-    res.json({ transcript: transcript.text });
+    res.json({ transcript: transcription.text });
   } catch (error) {
-    console.error("🔥 Whisper API error:", error);
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path); // Cleanup file even if error
+    console.error("❌ Whisper API error:");
+    if (error.response) {
+      console.error("Status:", error.response.status);
+      console.error("Data:", error.response.data);
+    } else {
+      console.error(error.message);
     }
+
+    // 🛡 Always return *proper JSON* to frontend even if failure
     res.status(500).json({ error: "Transcription failed", details: error.message });
   }
 });
+
 
 
 app.listen(port, () => {
