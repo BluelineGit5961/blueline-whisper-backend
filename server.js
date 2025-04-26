@@ -14,42 +14,38 @@ app.use(cors());
 app.use(express.json());
 
 // Set up multer for audio file uploads
+
 const upload = multer({ dest: "uploads/" });
+
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Whisper endpoint
-app.post("/whisper", upload.single("audio"), async (req, res) => {
+app.post("/whisper", upload.any(), async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: "No audio file uploaded" });
     }
 
-    const audioPath = path.resolve(req.file.path);
+    const audioFile = req.files[0];
 
-    console.log(`🛜 Received audio file: ${audioPath}`);
-
-    const response = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(audioPath),
+    const transcript = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(audioFile.path),
       model: "whisper-1",
-      response_format: "json"
     });
 
-    console.log("✅ Whisper response:", response);
+    // Cleanup
+    fs.unlinkSync(audioFile.path);
 
-    // Cleanup: delete file after use
-    fs.unlink(audioPath, err => {
-      if (err) console.error("Error deleting uploaded file:", err);
-    });
-
-    res.json({ transcript: response.text });
+    res.json({ transcript: transcript.text });
   } catch (error) {
-    console.error("❌ Whisper error:", error);
-    res.status(500).json({ error: error.message || "Unknown Whisper error" });
+    console.error("Whisper API error:", error);
+    res.status(500).json({ error: "Transcription failed" });
   }
 });
+
 
 // Health check (for Render etc.)
 app.get("/", (req, res) => {
