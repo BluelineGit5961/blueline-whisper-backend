@@ -23,21 +23,16 @@ const openai = new OpenAI({
 });
 
 // Whisper endpoint
-app.post("/whisper", upload.any(), async (req, res) => {
+app.post("/whisper", upload.single("audio"), async (req, res) => {
   try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: "No audio file uploaded" });
-    }
-
-    const audioFile = req.files[0];
+    console.log("📄 File received by backend:", req.file);  // ← ADD THIS
 
     const transcript = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(audioFile.path),
+      file: fs.createReadStream(req.file.path),
       model: "whisper-1",
     });
 
-    // Cleanup
-    fs.unlinkSync(audioFile.path);
+    fs.unlinkSync(req.file.path);
 
     res.json({ transcript: transcript.text });
   } catch (error) {
