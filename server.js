@@ -25,11 +25,12 @@ app.post("/whisper", upload.single("file"), async (req, res) => {
   try {
     console.log("📄 File received by backend:", req.file);
 
-    const transcript = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(req.file.path),
-      model: "whisper-1",
-      filename: req.file.originalname // <-- ADD THIS LINE
-    });
+const transcript = await openai.audio.transcriptions.create({
+  file: fs.createReadStream(req.file.path),
+  model: "whisper-1",
+  fileName: "recording.webm"   // 👈 ADD THIS
+});
+
 
     fs.unlinkSync(req.file.path); // cleanup
     res.json({ transcript: transcript.text });
