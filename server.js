@@ -23,7 +23,7 @@ const openai = new OpenAI({
 });
 
 // Whisper endpoint
-app.post("/whisper", upload.single("audio"), async (req, res) => {
+app.post("/whisper", upload.single("file"), async (req, res) => {
   try {
     console.log("📄 File received by backend:", req.file);  // ← ADD THIS
 
