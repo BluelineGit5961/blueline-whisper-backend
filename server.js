@@ -43,7 +43,8 @@ app.post("/whisper", upload.single("file"), async (req, res) => {
 
   } catch (error) {
     console.error("Whisper API error:", error);
-    res.status(500).json({ error: "Transcription failed" });
+    res.status(500).json({ error: error.message || "Transcription failed" });
+
   }
 });
 
