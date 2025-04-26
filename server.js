@@ -2,7 +2,6 @@ require("dotenv").config();
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
-const fs = require("fs");
 const { OpenAI } = require("openai");
 
 const app = express();
@@ -12,44 +11,35 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Set up multer for handling uploads
-const upload = multer({ dest: "uploads/" });
+// Set up multer for in-memory storage (🔥 no writing to disk)
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Whisper transcription endpoint
+// Whisper endpoint
 app.post("/whisper", upload.single("audio"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    console.log("✅ Received file:", req.file.originalname);
-
-    const transcription = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(req.file.path),
+    const transcript = await openai.audio.transcriptions.create({
+      file: new Blob([req.file.buffer]), // 🔥 use in-memory file directly
+      filename: "recording.webm",         // 🔥 important to provide filename!
       model: "whisper-1",
-      response_format: "json"  // Optional, but cleaner
+      response_format: "json"
     });
 
-    // Cleanup: delete the uploaded file
-    fs.unlinkSync(req.file.path);
-
-    res.json({ transcript: transcription.text });
+    res.json({ transcript: transcript.text });
   } catch (error) {
-    console.error("❌ Whisper API error:", error);
-    res.status(500).json({ error: error.message || "Transcription failed" });
+    console.error("Whisper API error:", error);
+    res.status(500).json({ error: "Transcription failed" });
   }
 });
 
-// Default root route (optional, to check server running)
-app.get("/", (req, res) => {
-  res.send("✅ Blueline Whisper Backend is running!");
-});
-
-// Start server
 app.listen(port, () => {
-  console.log(`🚀 Server listening on http://localhost:${port}`);
+  console.log(`✅ Whisper backend live on http://localhost:${port}`);
 });
