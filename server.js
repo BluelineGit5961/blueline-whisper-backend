@@ -25,25 +25,20 @@ app.post("/whisper", upload.single("file"), async (req, res) => {
   try {
     console.log("📄 File received by backend:", req.file);
 
-    const fileStream = fs.createReadStream(req.file.path);
-
-    const response = await openai.audio.transcriptions.create({
-      file: {
-        name: req.file.originalname,   // recording.webm
-        type: req.file.mimetype,        // audio/webm
-        stream: fileStream
-      },
-      model: "whisper-1"
+    const transcript = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(req.file.path),
+      model: "whisper-1",
+      filename: req.file.originalname // <-- ADD THIS LINE
     });
 
-    fs.unlinkSync(req.file.path);  // Cleanup temp file
-    res.json({ transcript: response.text });
+    fs.unlinkSync(req.file.path); // cleanup
+    res.json({ transcript: transcript.text });
+
   } catch (error) {
     console.error("Whisper API error:", error);
     res.status(500).json({ error: "Transcription failed" });
   }
 });
-
 
 // Health check (for Render etc.)
 app.get("/", (req, res) => {
