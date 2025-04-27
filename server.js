@@ -48,6 +48,17 @@ app.post("/whisper", upload.single("file"), async (req, res) => {
   }
 });
 
+app.post("/tts", async (req, res) => {
+  const { text, languageCode, voiceName } = req.body;
+  // … call your TTS engine here, e.g. Google Cloud Text-to-Speech …
+  const [response] = await ttsClient.synthesizeSpeech({
+    input: { text },
+    voice: { languageCode, name: voiceName },
+    audioConfig: { audioEncoding: 'MP3' }
+  });
+  res.set('Content-Type', 'audio/mpeg');
+  res.send(response.audioContent);
+});
 
 // Health check (for Render etc.)
 app.get("/", (req, res) => {
