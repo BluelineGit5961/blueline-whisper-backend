@@ -5,7 +5,6 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 const { OpenAI } = require("openai");
-const textToSpeech = require("@google-cloud/text-to-speech");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -34,9 +33,6 @@ const upload = multer({ storage });
 // ===== OpenAI Whisper client =====
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// ===== Google Cloud Text-to-Speech client =====
-const ttsClient = new textToSpeech.TextToSpeechClient();
-
 // ===== Preflight for specific routes =====
 app.options("/whisper", cors());
 app.options("/tts", cors());
@@ -61,6 +57,16 @@ app.post("/whisper", upload.single("file"), async (req, res) => {
 
 // ===== Text-to-Speech endpoint =====
 app.post("/tts", async (req, res) => {
+  let ttsClient;
+  try {
+    // Lazy-load the TTS library to avoid startup failure if missing
+    const textToSpeech = require("@google-cloud/text-to-speech");
+    ttsClient = new textToSpeech.TextToSpeechClient();
+  } catch (e) {
+    console.error("🛑 TTS module not installed:", e);
+    return res.status(501).json({ error: "TTS service unavailable (module missing)" });
+  }
+
   try {
     const { text, languageCode, voiceName } = req.body;
     if (!text || !languageCode || !voiceName) {
@@ -69,10 +75,10 @@ app.post("/tts", async (req, res) => {
     const [response] = await ttsClient.synthesizeSpeech({
       input: { text },
       voice: { languageCode, name: voiceName },
-      audioConfig: { audioEncoding: 'MP3' }
+      audioConfig: { audioEncoding: 'MP3' },
     });
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.set("Content-Type", "audio/mpeg");
+    res.setHeader("Content-Type", "audio/mpeg");
     res.send(response.audioContent);
   } catch (error) {
     console.error("🛑 TTS error:", error);
