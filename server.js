@@ -10,30 +10,36 @@ const textToSpeech = require("@google-cloud/text-to-speech");
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ===== Middleware =====
-app.use(cors());
-app.use(express.json());
+// ===== CORS Configuration =====
+app.use(cors({ origin: "*" }));
+app.options("*", cors());
+
+// ===== Body Parsers =====
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+// ===== Ensure uploads directory exists =====
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 // ===== Multer setup for audio uploads =====
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.resolve(__dirname, "uploads");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  },
+  destination: uploadsDir,
+  filename: (req, file, cb) => cb(null, file.originalname)
 });
 const upload = multer({ storage });
 
 // ===== OpenAI Whisper client =====
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // ===== Google Cloud Text-to-Speech client =====
 const ttsClient = new textToSpeech.TextToSpeechClient();
+
+// ===== Preflight for specific routes =====
+app.options("/whisper", cors());
+app.options("/tts", cors());
 
 // ===== Whisper transcription endpoint =====
 app.post("/whisper", upload.single("file"), async (req, res) => {
@@ -44,8 +50,8 @@ app.post("/whisper", upload.single("file"), async (req, res) => {
       model: "whisper-1",
       fileName: req.file.originalname
     });
-    // Clean up upload
     fs.unlinkSync(req.file.path);
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.json({ transcript: transcript.text });
   } catch (error) {
     console.error("🛑 Whisper error:", error);
@@ -65,7 +71,8 @@ app.post("/tts", async (req, res) => {
       voice: { languageCode, name: voiceName },
       audioConfig: { audioEncoding: 'MP3' }
     });
-    res.set('Content-Type', 'audio/mpeg');
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.set("Content-Type", "audio/mpeg");
     res.send(response.audioContent);
   } catch (error) {
     console.error("🛑 TTS error:", error);
@@ -75,10 +82,11 @@ app.post("/tts", async (req, res) => {
 
 // ===== Health check =====
 app.get("/", (req, res) => {
-  res.send("✅ Whisper & TTS backend is alive");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.send("✅ Backend is alive and ready");
 });
 
 // ===== Start server =====
 app.listen(port, () => {
-  console.log(`✅ Backend running on http://localhost:${port}`);
+  console.log(`✅ Server running on port ${port}`);
 });
