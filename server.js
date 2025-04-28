@@ -57,14 +57,16 @@ app.post("/whisper", upload.single("file"), async (req, res) => {
 
 // ===== Text-to-Speech endpoint =====
 app.post("/tts", async (req, res) => {
+  const textToSpeech = require("@google-cloud/text-to-speech");
   let ttsClient;
-  try {
-    // Lazy-load the TTS library to avoid startup failure if missing
-    const textToSpeech = require("@google-cloud/text-to-speech");
+
+  // If you’ve injected your key JSON into GOOGLE_CREDENTIALS_JSON, use it
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    ttsClient = new textToSpeech.TextToSpeechClient({ credentials: creds });
+  } else {
+    // Fallback to ADC (e.g. GOOGLE_APPLICATION_CREDENTIALS file or GCE metadata)
     ttsClient = new textToSpeech.TextToSpeechClient();
-  } catch (e) {
-    console.error("🛑 TTS module not installed:", e);
-    return res.status(501).json({ error: "TTS service unavailable (module missing)" });
   }
 
   try {
@@ -72,11 +74,13 @@ app.post("/tts", async (req, res) => {
     if (!text || !languageCode || !voiceName) {
       return res.status(400).json({ error: "Missing text, languageCode or voiceName" });
     }
+
     const [response] = await ttsClient.synthesizeSpeech({
       input: { text },
       voice: { languageCode, name: voiceName },
-      audioConfig: { audioEncoding: 'MP3' },
+      audioConfig: { audioEncoding: "MP3" },
     });
+
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Content-Type", "audio/mpeg");
     res.send(response.audioContent);
@@ -85,6 +89,7 @@ app.post("/tts", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // ===== Health check =====
 app.get("/", (req, res) => {
