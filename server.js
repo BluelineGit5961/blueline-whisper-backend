@@ -90,6 +90,24 @@ app.post("/tts", async (req, res) => {
   }
 });
 
+app.post("/chat", async (req, res) => {
+  try {
+    const { model, messages, temperature } = req.body;
+    if (!model || !messages) {
+      return res.status(400).json({ error: "Missing model or messages in request" });
+    }
+    // Forward the chat request to OpenAI
+    const chatResp = await openai.chat.completions.create({
+      model,
+      messages,
+      temperature: temperature ?? 0.7
+    });
+    res.json(chatResp);
+  } catch (err) {
+    console.error("❌ /chat proxy error:", err);
+    res.status(500).json({ error: err.message || "Chat proxy failed" });
+  }
+});
 
 // ===== Health check =====
 app.get("/", (req, res) => {
